@@ -14,6 +14,9 @@
 #include <circle/koptions.h>
 #include <circle/interrupt.h>
 #include <circle/timer.h>
+#include <circle/fs/fat/fatfs.h>
+#include <circle/macros.h>
+#include <circle/usb/usbmassdevice.h>
 
 class CKernel
 {
@@ -26,6 +29,7 @@ public:
 
 private:
     static void KeyPressedHandler(const char* pString);
+    void ExecuteCommand(const char* pCommand);
 
     CActLED             m_ActLED;
     CKernelOptions      m_Options;
@@ -35,11 +39,12 @@ private:
     CInterruptSystem    m_Interrupt;
     CTimer              m_Timer;
     CUSBHCIDevice       m_USBHCI;
+    CFATFileSystem      m_FileSystem;
     CUSBKeyboardDevice* volatile m_pKeyboard;
-
-    // Buffer to hold typed characters
     char m_InputBuffer[64];
+    boolean m_bFileSystemMounted;
     int  m_nInputIndex;
+    volatile bool m_bCommandReady;
 
     static CKernel* s_pThis;
 };
