@@ -7,6 +7,9 @@
 #include <circle/usb/usbhcidevice.h>
 #include <circle/usb/usbkeyboard.h>
 #include <circle/devicenameservice.h>
+#include <circle/machineinfo.h>
+#include <circle/util.h>
+#include <circle/memory.h>
 #include <circle/actled.h>
 #include <circle/koptions.h>
 #include <circle/interrupt.h>

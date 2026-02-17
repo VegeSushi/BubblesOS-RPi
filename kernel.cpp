@@ -15,6 +15,25 @@ static int compare_strings(const char* s1, const char* s2)
     return *(unsigned char*)s1 - *(unsigned char*)s2;
 }
 
+static void StringFormatNumber(unsigned int n, char* buf, size_t bufSize) {
+    if (bufSize == 0) return;
+    if (n == 0) {
+        buf[0] = '0'; buf[1] = '\0';
+        return;
+    }
+    char tmp[12];
+    int i = 0;
+    while (n > 0 && i < 11) {
+        tmp[i++] = (n % 10) + '0';
+        n /= 10;
+    }
+    int j = 0;
+    while (i > 0 && (size_t)j < bufSize - 1) {
+        buf[j++] = tmp[--i];
+    }
+    buf[j] = '\0';
+}
+
 CKernel::CKernel(void)
 : m_ActLED(),
   m_Options(),
@@ -39,7 +58,7 @@ CKernel::~CKernel(void)
 boolean CKernel::Initialize(void)
 {
     if (!m_Screen.Initialize())       return FALSE;
-    if (!m_Serial.Initialize(115200)) return FALSE;
+    // Serial initialization removed
     if (!m_Interrupt.Initialize())    return FALSE;
     if (!m_Timer.Initialize())        return FALSE;
     if (!m_USBHCI.Initialize())       return FALSE;
@@ -49,9 +68,9 @@ boolean CKernel::Initialize(void)
 
 void CKernel::Run(void)
 {
-    static const char msg[] = "\nBubblesOS (Rpi 4) initialized.\nCommands: debug, help\n> ";
+    // Original boot message preserved
+    static const char msg[] = "\nBubblesOS (Rpi 4) initialized.\n> ";
     m_Screen.Write(msg, sizeof(msg) - 1);
-    m_Serial.Write(msg, sizeof(msg) - 1);
 
     while (true)
     {
@@ -76,38 +95,44 @@ void CKernel::KeyPressedHandler(const char* pString)
     {
         char c = *p;
 
-        // --- 1. Handle Backspace (ASCII 8 or 127) ---
+        // --- 1. Handle Backspace ---
         if (c == '\b' || c == 127)
         {
             if (s_pThis->m_nInputIndex > 0)
             {
                 s_pThis->m_nInputIndex--;
-                // Visual erase: Move cursor back, print space, move back again
                 const char eraseSeq[] = {'\b', ' ', '\b'};
                 s_pThis->m_Screen.Write(eraseSeq, 3);
-                s_pThis->m_Serial.Write(eraseSeq, 3);
             }
             continue;
         }
 
-        // --- 2. Handle Enter (Execute) ---
+        // --- 2. Handle Enter ---
         if (c == '\r' || c == '\n')
         {
             s_pThis->m_Screen.Write("\n", 1);
-            s_pThis->m_Serial.Write("\n", 1);
-
             s_pThis->m_InputBuffer[s_pThis->m_nInputIndex] = '\0';
 
-            // Use our manual comparison function instead of strcmp
             if (compare_strings(s_pThis->m_InputBuffer, "debug") == 0)
             {
-                const char dMsg[] = "Status: BubblesOS kernel is active.\n";
-                s_pThis->m_Screen.Write(dMsg, sizeof(dMsg) - 1);
-            }
-            else if (compare_strings(s_pThis->m_InputBuffer, "help") == 0)
-            {
-                const char hMsg[] = "Commands: debug, help\n";
-                s_pThis->m_Screen.Write(hMsg, sizeof(hMsg) - 1);
+                CMachineInfo *pInfo = CMachineInfo::Get();
+                CMemorySystem *pMemory = CMemorySystem::Get();
+                char buf[64];
+
+                s_pThis->m_Screen.Write("--- System Debug ---\n", 21);
+
+                // 1. Board Info
+                s_pThis->m_Screen.Write("Model: ", 7);
+                const char* modelName = pInfo->GetMachineName();
+                s_pThis->m_Screen.Write(modelName, strlen(modelName));
+                s_pThis->m_Screen.Write("\n", 1);
+
+                // 2. RAM Info
+                s_pThis->m_Screen.Write("RAM: ", 5);
+                size_t nRAMBytes = pMemory->GetMemSize();
+                StringFormatNumber(nRAMBytes / (1024 * 1024), buf, sizeof(buf));
+                s_pThis->m_Screen.Write(buf, strlen(buf));
+                s_pThis->m_Screen.Write(" MB Total\n", 10);
             }
             else if (s_pThis->m_nInputIndex > 0)
             {
@@ -117,7 +142,6 @@ void CKernel::KeyPressedHandler(const char* pString)
 
             s_pThis->m_nInputIndex = 0;
             s_pThis->m_Screen.Write("> ", 2);
-            s_pThis->m_Serial.Write("> ", 2);
         }
         // --- 3. Handle Regular Characters ---
         else if (c >= 32 && c <= 126)
@@ -126,7 +150,6 @@ void CKernel::KeyPressedHandler(const char* pString)
             {
                 s_pThis->m_InputBuffer[s_pThis->m_nInputIndex++] = c;
                 s_pThis->m_Screen.Write(&c, 1);
-                s_pThis->m_Serial.Write(&c, 1);
             }
         }
     }
