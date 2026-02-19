@@ -7,9 +7,10 @@ extern "C" {
     #include "ubasic/tokenizer.h"
 }
 
-// Static pointer for callbacks
 CKernel* CKernel::s_pThis = 0;
+
 static CScreenDevice* g_pScreen = 0;
+static CActLED* g_pActLED = 0;
 
 // Helper: Check if input starts with cmd followed by space or null
 static int is_command(const char* input, const char* cmd)
@@ -80,6 +81,7 @@ CKernel::CKernel(void)
 {
     s_pThis = this;
     g_pScreen = &m_Screen;
+    g_pActLED = &m_ActLED;
     m_ActLED.Blink(5); 
 }
 
@@ -176,6 +178,44 @@ void CKernel::KeyPressedHandler(const char* pString)
             }
         }
     }
+}
+
+extern "C" {
+    static int g_plot_x = 0;
+    static int g_plot_y = 0;
+
+    void my_basic_poke(VARIABLE_TYPE addr, VARIABLE_TYPE value) {
+        // Force the char/int range into an int for the switch
+        int a = (int)((unsigned char)addr);
+
+        switch (a) {
+            case 0: 
+                if (g_pActLED) {
+                    if (value > 0) g_pActLED->On();
+                    else           g_pActLED->Off();
+                }
+                break;
+
+            case 1: g_plot_x = (int)value; break;
+            case 2: g_plot_y = (int)value; break;
+
+            case 3: 
+                if (g_pScreen) {
+                    g_pScreen->SetPixel(g_plot_x, g_plot_y, NORMAL_COLOR);
+                }
+                break;
+
+            case 4: 
+                if (g_pScreen) {
+                    // Circle console clear: Form Feed character
+                    g_pScreen->Write("\f", 1);
+                }
+                break;
+            
+            default:
+                break;
+        }
+    } 
 }
 
 void CKernel::ExecuteCommand(const char* input)
@@ -279,6 +319,7 @@ void CKernel::ExecuteCommand(const char* input)
             if (content.GetLength() == 0) {
                 m_Screen.Write("File not found.\n", 16);
             } else {
+                ubasic_set_poke_function(my_basic_poke);
                 m_Screen.Write("Executing...\n", 13);
             
                 ubasic_init((const char*)content);
