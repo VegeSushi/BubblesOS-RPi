@@ -28,6 +28,7 @@ public:
     void Run(void);
 
 private:
+    CString ReadFileContents(const char* pFilename);
     static void KeyPressedHandler(const char* pString);
     void ExecuteCommand(const char* pCommand);
 

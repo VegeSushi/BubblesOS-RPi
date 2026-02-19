@@ -35,6 +35,29 @@ static void StringFormatNumber(unsigned int n, char* buf, size_t bufSize) {
     buf[j] = '\0';
 }
 
+CString CKernel::ReadFileContents(const char* pFilename)
+{
+    CString Content;
+    unsigned hFile = m_FileSystem.FileOpen(pFilename);
+    
+    if (hFile == 0) 
+    {
+        return Content; 
+    }
+
+    char Buffer[512]; 
+    unsigned nRead;
+
+    while ((nRead = m_FileSystem.FileRead(hFile, Buffer, sizeof(Buffer) - 1)) > 0) 
+    {
+        Buffer[nRead] = '\0';
+        Content += Buffer;
+    }
+
+    m_FileSystem.FileClose(hFile);
+    return Content;
+}
+
 CKernel::CKernel(void)
 : m_ActLED(),
   m_Options(),
@@ -218,20 +241,15 @@ void CKernel::ExecuteCommand(const char* input)
         }
         else 
         {
-            unsigned hFile = m_FileSystem.FileOpen(arg);
-            if (hFile == 0) 
+            CString fileData = ReadFileContents(arg);
+        
+            if (fileData.GetLength() == 0) 
             {
-                m_Screen.Write("File not found\n", 15);
+                m_Screen.Write("File not found or empty\n", 24);
             }
             else 
             {
-                char Buffer[128];
-                unsigned nRead;
-                while ((nRead = m_FileSystem.FileRead(hFile, Buffer, sizeof(Buffer))) > 0) 
-                {
-                    m_Screen.Write(Buffer, nRead);
-                }
-                m_FileSystem.FileClose(hFile);
+                m_Screen.Write((const char*)fileData, fileData.GetLength());
                 m_Screen.Write("\n", 1);
             }
         }
