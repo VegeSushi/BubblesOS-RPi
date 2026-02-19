@@ -2,8 +2,14 @@
 #include <circle/string.h>
 #include <assert.h>
 
+extern "C" {
+    #include "ubasic/ubasic.h"
+    #include "ubasic/tokenizer.h"
+}
+
 // Static pointer for callbacks
 CKernel* CKernel::s_pThis = 0;
+static CScreenDevice* g_pScreen = 0;
 
 // Helper: Check if input starts with cmd followed by space or null
 static int is_command(const char* input, const char* cmd)
@@ -73,6 +79,7 @@ CKernel::CKernel(void)
   m_bCommandReady(FALSE)
 {
     s_pThis = this;
+    g_pScreen = &m_Screen;
     m_ActLED.Blink(5); 
 }
 
@@ -260,8 +267,48 @@ void CKernel::ExecuteCommand(const char* input)
         m_Screen.Write("Discovered Devices:\n", 20);
         m_DeviceNameService.ListDevices(&m_Screen);
     }
+    else if (is_command(input, "run"))
+    {
+        const char* filename = &input[3];
+        while (*filename == ' ') filename++; // Skip spaces
+
+        if (*filename == '\0') {
+            m_Screen.Write("Usage: run <file.bas>\n", 22);
+        } else {
+            CString content = ReadFileContents(filename);
+            if (content.GetLength() == 0) {
+                m_Screen.Write("File not found.\n", 16);
+            } else {
+                m_Screen.Write("Executing...\n", 13);
+            
+                ubasic_init((const char*)content);
+            
+                while(!ubasic_finished()) {
+                    ubasic_run();
+                }
+            
+                m_Screen.Write("\nDone.\n", 7);
+            }
+        }
+    }
     else if (strlen(input) > 0)
     {
         m_Screen.Write("Unknown command\n", 16);
+    }
+}
+
+extern "C" {
+    void circle_basic_print(const char *s) {
+        if (g_pScreen && s) {
+            g_pScreen->Write(s, strlen(s));
+        }
+    }
+
+    void circle_basic_print_num(int n) {
+        if (g_pScreen) {
+            char buf[16];
+            StringFormatNumber((unsigned int)n, buf, sizeof(buf));
+            g_pScreen->Write(buf, strlen(buf));
+        }
     }
 }
